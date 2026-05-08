@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}ورود | ابجد{% endblock %}
+{% block content %}
+<section class="hero login-card">
+    <div>
+        <span class="eyebrow">سامانه وب ابجد</span>
+        <h1>ورود به فضای کاری</h1>
+        <p>جمله را وارد کنید، محاسبه را ببینید، داخل جدول ذخیره کنید و پس از بررسی به جدول اصلی منتقل کنید.</p>
+    </div>
+    <form method="post" class="card form-card">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="form-grid single">
+            {% for field in form %}
+                <label class="field">
+                    <span>{{ field.label }}</span>
+                    {{ field }}
+                    {% if field.errors %}<small class="error-text">{{ field.errors|join:", " }}</small>{% endif %}
+                </label>
+            {% endfor %}
+        </div>
+        <button type="submit" class="primary-btn">ورود</button>
+    </form>
+</section>
+{% endblock %}

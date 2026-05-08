@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | ابجد{% endblock %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <span class="eyebrow">فرم جدول</span>
+        <h1>{{ title }}</h1>
+    </div>
+</section>
+<section class="card form-card wide">
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-grid">
+            {% for field in form %}
+                <label class="field checkbox-field {% if field.name == 'members' %}full-width{% endif %}">
+                    <span>{{ field.label }}</span>
+                    {{ field }}
+                    {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                    {% if field.errors %}<small class="error-text">{{ field.errors|join:", " }}</small>{% endif %}
+                </label>
+            {% endfor %}
+        </div>
+        <div class="actions-row">
+            <button type="submit" class="primary-btn">ذخیره</button>
+            <a href="{% url 'entries:project_list' %}" class="secondary-btn">بازگشت</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

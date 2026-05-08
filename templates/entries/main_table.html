@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% load entries_extras %}
+{% block title %}جدول اصلی | ابجد{% endblock %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <span class="eyebrow">مرجع نهایی</span>
+        <h1>جدول اصلی</h1>
+        <p>این جدول خروجی‌های تایید شده را نگهداری می‌کند و برای backup یا export همیشه آماده است.</p>
+    </div>
+</section>
+
+<section class="card">
+    {% if request.user.is_staff %}
+        <p class="inline-hint">برای ویرایش هر مقدار، روی همان سلول دوبار کلیک کنید. متن کامل داخل جدول نشان داده می‌شود و عرض ستون‌ها را می‌توانید با ماوس تغییر دهید.</p>
+    {% endif %}
+    <div class="toolbar split">
+        <form method="get" class="toolbar">
+            <input type="search" name="q" value="{{ q }}" placeholder="جستجو در جدول اصلی">
+            <button class="secondary-btn" type="submit">جستجو</button>
+        </form>
+        <div class="toolbar">
+            <button class="secondary-btn" type="button" data-toggle-columns="main-table-columns">ستون‌ها</button>
+            {% if request.user.is_staff %}
+                <form method="post" enctype="multipart/form-data" action="{% url 'entries:main_import' %}">
+                    {% csrf_token %}
+                    {{ import_form.file }}
+                    <button class="secondary-btn" type="submit">درون‌ریزی csv/xlsm</button>
+                </form>
+            {% endif %}
+            <a class="ghost-link" href="{% url 'entries:main_export' 'csv' %}?{% query_transform %}">خروجی csv</a>
+            <a class="ghost-link" href="{% url 'entries:main_export' 'xlsm' %}?{% query_transform %}">خروجی xlsm</a>
+        </div>
+    </div>
+    <form method="get" class="filter-card">
+        <div class="filter-card-head">
+            <strong>فیلتر پیشرفته</strong>
+            <span class="muted">چند شرط هم‌زمان روی فیلدها بگذارید و نتیجه را دقیق‌تر محدود کنید.</span>
+        </div>
+        <input type="hidden" name="q" value="{{ q }}">
+        <div class="filter-grid">
+            {% for row in filter_rows %}
+                <div class="filter-row">
+                    {% if not forloop.first %}
+                        <select name="filter_join_{{ row.index }}">
+                            <option value="and" {% if row.join == 'and' %}selected{% endif %}>و</option>
+                            <option value="or" {% if row.join == 'or' %}selected{% endif %}>یا</option>
+                        </select>
+                    {% else %}
+                        <div class="filter-join-label">اگر</div>
+                    {% endif %}
+                    <select name="filter_field_{{ row.index }}">
+                        <option value="">فیلد</option>
+                        {% for field, label, kind in filter_fields %}
+                            <option value="{{ field }}" {% if row.field == field %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="filter_operator_{{ row.index }}">
+                        {% for value, label in filter_operators %}
+                            <option value="{{ value }}" {% if row.operator == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" name="filter_value_{{ row.index }}" value="{{ row.value }}" placeholder="مقدار شرط">
+                </div>
+            {% endfor %}
+        </div>
+        <div class="actions-row">
+            <button type="submit" class="secondary-btn">اعمال فیلتر</button>
+            <a class="ghost-link" href="{% url 'entries:main_table' %}">پاک کردن فیلترها</a>
+        </div>
+    </form>
+    <div id="main-table-columns" class="column-panel hidden">
+        {% for field, label in headers.items %}
+            <label><input type="checkbox" checked data-column-toggle="main-table" value="{{ field }}"> {{ label }}</label>
+        {% endfor %}
+    </div>
+    {% if request.user.is_staff %}
+        <form method="post" action="{% url 'entries:main_bulk_action' %}" class="bulk-actions-card" id="main-bulk-form">
+            {% csrf_token %}
+            <input type="hidden" name="q" value="{{ q }}">
+            <input type="hidden" name="sort" value="{{ sort }}">
+            <input type="hidden" name="direction" value="{{ direction }}">
+            {% for row in filter_rows %}
+                <input type="hidden" name="filter_join_{{ row.index }}" value="{{ row.join }}">
+                <input type="hidden" name="filter_field_{{ row.index }}" value="{{ row.field }}">
+                <input type="hidden" name="filter_operator_{{ row.index }}" value="{{ row.operator }}">
+                <input type="hidden" name="filter_value_{{ row.index }}" value="{{ row.value }}">
+            {% endfor %}
+            <div class="bulk-actions-head">
+                <label class="select-all-card">
+                    <input type="checkbox" id="select-all-main-rows">
+                    <span>انتخاب همه ردیف‌های این صفحه</span>
+                </label>
+            </div>
+            <div class="toolbar">
+                <label class="bulk-check">
+                    <input type="checkbox" id="select-all-main-filtered" name="select_all_filtered" value="1">
+                    <span>انتخاب همه نتایج فیلترشده</span>
+                </label>
+                <select name="bulk_action">
+                    <option value="">عملیات گروهی</option>
+                    <option value="delete">حذف از جدول اصلی</option>
+                </select>
+                <button type="submit" class="primary-btn">اجرای عملیات</button>
+            </div>
+        </form>
+    {% endif %}
+
+    <div class="table-wrap">
+        <table class="data-table inline-edit-table" data-table-id="main-table">
+            <colgroup>
+                {% if request.user.is_staff %}<col class="col-bulk-select">{% endif %}
+                <col class="col-row-number" data-column="row_number">
+                <col class="col-phrase" data-column="phrase">
+                <col class="col-number" data-column="abjad_value">
+                <col class="col-number" data-column="prime_index">
+                <col class="col-number" data-column="digit_root">
+                <col class="col-number" data-column="abjad_sum">
+                <col class="col-short-text" data-column="parity_label">
+                <col class="col-number" data-column="parity_order">
+                <col class="col-number" data-column="letter_count">
+                <col class="col-number" data-column="dot_count">
+                <col class="col-number" data-column="unique_letter_count">
+                <col class="col-used-letters" data-column="used_letters">
+                <col class="col-number" data-column="pronounced_value">
+                <col class="col-number" data-column="alif_count">
+                <col class="col-number" data-column="abjad_saghir">
+                <col class="col-breakdown" data-column="breakdown">
+            </colgroup>
+            <thead>
+                <tr>
+                    {% if request.user.is_staff %}<th class="selection-col">انتخاب</th>{% endif %}
+                    {% for field, label in headers.items %}
+                        {% if field == 'breakdown' %}
+                            <th data-column="{{ field }}">
+                                <span class="th-content">{{ label }}</span>
+                                <span class="col-resizer" data-resize-column="{{ field }}"></span>
+                            </th>
+                        {% else %}
+                            <th data-column="{{ field }}">
+                                {% if sort == field and direction == 'asc' %}
+                                    <a class="th-content" href="?{% query_transform sort=field direction='desc' page='' %}">{{ label }}</a>
+                                {% else %}
+                                    <a class="th-content" href="?{% query_transform sort=field direction='asc' page='' %}">{{ label }}</a>
+                                {% endif %}
+                                <span class="col-resizer" data-resize-column="{{ field }}"></span>
+                            </th>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in page_obj %}
+                    <tr data-inline-row="main" data-row-key="{{ entry.pk }}" data-update-url="{% url 'entries:main_entry_inline_update' entry.pk %}" class="{% if entry.has_mismatch %}mismatch-row{% endif %}">
+                        {% if request.user.is_staff %}
+                            <td class="selection-col">
+                                <input type="checkbox" class="main-row-check" name="entry_ids" value="{{ entry.pk }}" form="main-bulk-form">
+                            </td>
+                        {% endif %}
+                        <td data-field="row_number" {% if request.user.is_staff %}data-editable="true" data-input-type="number"{% endif %}><span class="cell-text">{{ entry.row_number }}</span></td>
+                        <td data-field="phrase" {% if request.user.is_staff %}data-editable="true" data-input-type="text"{% endif %} class="{% if 'phrase' in entry.mismatch_fields %}mismatch-cell{% endif %}" title="{% if entry.invalid_phrase_chars %}کاراکترهای نامعتبر: {{ entry.invalid_phrase_chars|join:' ' }}{% endif %}"><span class="cell-text">{{ entry.phrase }}</span></td>
+                        <td data-field="abjad_value" {% if request.user.is_staff %}data-editable="true" data-input-type="number"{% endif %} class="{% if 'abjad_value' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.abjad_value }}</span></td>
+                        <td data-field="prime_index" {% if request.user.is_staff %}data-editable="true" data-input-type="number"{% endif %} class="{% if 'prime_index' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.prime_index }}</span></td>
+                        <td data-field="digit_root" {% if request.user.is_staff %}data-editable="true" data-input-type="number"{% endif %} class="{% if 'digit_root' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.digit_root }}</span></td>
+                        <td data-field="abjad_sum" {% if request.user.is_staff %}data-editable="true" data-input-type="number"{% endif %} class="{% if 'abjad_sum' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.abjad_sum }}</span></td>
+                        <td data-field="parity_label" {% if request.user.is_staff %}data-editable="true" data-input-type="text"{% endif %} class="{% if 'parity_label' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.parity_label }}</span></td>
+                        <td data-field="parity_order" {% if request.user.is_staff %}data-editable="true" data-input-type="number"{% endif %} class="{% if 'parity_order' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.parity_order }}</span></td>
+                        <td data-field="letter_count" {% if request.user.is_staff %}data-editable="true" data-input-type="number"{% endif %} class="{% if 'letter_count' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.letter_count }}</span></td>
+                        <td data-field="dot_count" {% if request.user.is_staff %}data-editable="true" data-input-type="number"{% endif %} class="{% if 'dot_count' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.dot_count }}</span></td>
+                        <td data-field="unique_letter_count" class="{% if 'unique_letter_count' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.unique_letter_count }}</span></td>
+                        <td data-field="used_letters" class="{% if 'used_letters' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.used_letters }}</span></td>
+                        <td data-field="pronounced_value" {% if request.user.is_staff %}data-editable="true" data-input-type="number"{% endif %} class="{% if 'pronounced_value' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.pronounced_value }}</span></td>
+                        <td data-field="alif_count" {% if request.user.is_staff %}data-editable="true" data-input-type="number"{% endif %} class="{% if 'alif_count' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.alif_count }}</span></td>
+                        <td data-field="abjad_saghir" {% if request.user.is_staff %}data-editable="true" data-input-type="number"{% endif %} class="{% if 'abjad_saghir' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.abjad_saghir }}</span></td>
+                        <td class="breakdown-cell {% if 'breakdown' in entry.mismatch_fields %}mismatch-cell{% endif %}" data-field="breakdown" {% if request.user.is_staff %}data-editable="true" data-input-type="text"{% endif %}><span class="cell-text">{{ entry.breakdown }}</span></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="{% if request.user.is_staff %}17{% else %}16{% endif %}" class="muted center">جدول اصلی هنوز خالی است.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "entries/pagination.html" with page_obj=page_obj %}
+</section>
+{% endblock %}

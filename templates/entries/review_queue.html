@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}صف بررسی | ابجد{% endblock %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <span class="eyebrow">بازبینی</span>
+        <h1>صف بررسی مدیر</h1>
+        <p>رکوردها را بررسی کنید، در صورت نیاز ویرایش کنید و سپس به جدول اصلی منتقل کنید.</p>
+    </div>
+</section>
+
+<section class="card">
+    <form method="get" class="toolbar">
+        <input type="search" name="q" value="{{ q }}" placeholder="جستجو در پروژه یا عبارت">
+        <button class="secondary-btn" type="submit">جستجو</button>
+    </form>
+    <div class="review-list">
+        {% for entry in page_obj %}
+            <article class="review-card">
+                <div>
+                    <span class="eyebrow">{{ entry.project.name }}</span>
+                    <h3>{{ entry.phrase }}</h3>
+                    <p>عدد ابجد: {{ entry.abjad_value }} | ریشه: {{ entry.digit_root }} | وضعیت: {{ entry.get_review_status_display }}</p>
+                </div>
+                <div class="actions-row">
+                    <a class="secondary-btn" href="{% url 'entries:project_entry_edit' entry.pk %}">ویرایش</a>
+                    <a class="primary-btn" href="{% url 'entries:project_entry_approve' entry.pk %}">انتقال به جدول اصلی</a>
+                </div>
+            </article>
+        {% empty %}
+            <p class="muted">فعلا موردی در صف بررسی نیست.</p>
+        {% endfor %}
+    </div>
+    {% include "entries/pagination.html" with page_obj=page_obj %}
+</section>
+{% endblock %}

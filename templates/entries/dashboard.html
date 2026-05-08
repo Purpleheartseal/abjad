@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}داشبورد | ابجد{% endblock %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <span class="eyebrow">داشبورد</span>
+        <h1>مرکز مدیریت ابجد</h1>
+        <p>همه جدول‌ها، رکوردها و صف بررسی از اینجا در دسترس است.</p>
+    </div>
+    <div class="header-actions">
+        <a class="primary-btn" href="{% url 'entries:project_create' %}">ایجاد جدول جدید</a>
+        {% if can_access_main_table %}
+            <a class="secondary-btn" href="{% url 'entries:main_table' %}">مشاهده جدول اصلی</a>
+        {% endif %}
+    </div>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card"><span>تعداد جدول‌ها</span><strong>{{ stats.project_count }}</strong></article>
+    <article class="stat-card"><span>رکوردهای پروژه</span><strong>{{ stats.project_entry_count }}</strong></article>
+    <article class="stat-card"><span>رکوردهای جدول اصلی</span><strong>{{ stats.main_entry_count|default:"—" }}</strong></article>
+    <article class="stat-card"><span>در انتظار بررسی</span><strong>{{ stats.pending_review_count }}</strong></article>
+</section>
+
+<section class="panel-grid">
+    <article class="card">
+        <div class="section-head">
+            <h2>جدول‌های اخیر</h2>
+            <a href="{% url 'entries:project_list' %}">همه جدول‌ها</a>
+        </div>
+        <div class="project-cards">
+            {% for project in recent_projects %}
+                <a class="project-card" href="{% url 'entries:project_detail' project.pk %}">
+                    <strong>{{ project.name }}</strong>
+                    <span>مالک: {{ project.owner }}</span>
+                    <small>{{ project.entry_total }} رکورد</small>
+                </a>
+            {% empty %}
+                <p class="muted">هنوز جدولی ایجاد نشده است.</p>
+            {% endfor %}
+        </div>
+    </article>
+    <article class="card">
+        <div class="section-head">
+            <h2>آخرین رکوردهای جدول اصلی</h2>
+        </div>
+        <div class="simple-list">
+            {% if can_access_main_table %}
+                {% for entry in recent_main_entries %}
+                    <div class="list-row">
+                        <strong>{{ entry.phrase }}</strong>
+                        <span>{{ entry.abjad_value }} | {{ entry.parity_label }}</span>
+                    </div>
+                {% empty %}
+                    <p class="muted">هنوز رکوردی به جدول اصلی منتقل نشده است.</p>
+                {% endfor %}
+            {% else %}
+                <p class="muted">دسترسی این کاربر به جدول اصلی فعال نشده است.</p>
+            {% endif %}
+        </div>
+    </article>
+</section>
+{% endblock %}

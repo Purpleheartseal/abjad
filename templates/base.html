@@ -1,0 +1,52 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}ابجد{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand-badge">ابجد</span>
+                <p>پلتفرم مدیریت جدول‌های ابجد</p>
+            </div>
+            {% if request.user.is_authenticated %}
+                <nav class="nav">
+                    <a href="{% url 'entries:dashboard' %}">داشبورد</a>
+                    <a href="{% url 'entries:project_list' %}">جدول‌های پروژه</a>
+                    {% if request.user.can_view_main_table %}
+                        <a href="{% url 'entries:main_table' %}">جدول اصلی</a>
+                    {% endif %}
+                    <a href="{% url 'entries:features' %}">امکانات</a>
+                    {% if request.user.is_staff %}
+                        <a href="{% url 'entries:review_queue' %}">صف بررسی</a>
+                        <a href="{% url 'entries:user_management' %}">مدیریت کاربران</a>
+                    {% endif %}
+                </nav>
+                <div class="sidebar-footer">
+                    <div>
+                        <strong>{{ request.user }}</strong>
+                        <small>{% if request.user.is_staff %}مدیر سیستم{% else %}کاربر{% endif %}</small>
+                    </div>
+                    <a class="ghost-link" href="{% url 'accounts:logout' %}">خروج</a>
+                </div>
+            {% endif %}
+        </aside>
+        <main class="content">
+            {% if messages %}
+                <div class="message-stack">
+                    {% for message in messages %}
+                        <div class="message {{ message.tags }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    <script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{% load entries_extras %}
+{% if page_obj.has_other_pages %}
+    <div class="pagination">
+        {% if page_obj.has_previous %}
+            <a href="?{% query_transform page=page_obj.previous_page_number %}">&lsaquo; قبلی</a>
+        {% endif %}
+        <span>صفحه {{ page_obj.number }} از {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+            <a href="?{% query_transform page=page_obj.next_page_number %}">بعدی &rsaquo;</a>
+        {% endif %}
+    </div>
+{% endif %}

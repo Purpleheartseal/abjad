@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}امکانات | ابجد{% endblock %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <span class="eyebrow">ابزارهای تکمیلی</span>
+        <h1>امکانات</h1>
+        <p>ابزارهای پاک‌سازی داده و پشتیبان‌گیری دیتابیس از این بخش در دسترس هستند.</p>
+    </div>
+</section>
+
+<section class="panel-grid">
+    <article class="card">
+        <div class="section-head">
+            <h2>ماشین‌حساب عبارت</h2>
+        </div>
+        <form method="get" class="quick-add-card">
+            <input type="hidden" name="source_type" value="{{ source_type }}">
+            <input type="hidden" name="project" value="{{ selected_project.pk|default:'' }}">
+            <label class="field full-width">
+                <span>عبارت</span>
+                <input type="text" name="calculator_phrase" value="{{ calculator_phrase }}" placeholder="عبارت را فقط برای محاسبه وارد کنید">
+            </label>
+            <div class="actions-row">
+                <button type="submit" class="primary-btn">محاسبه</button>
+                <a class="ghost-link" href="{% url 'entries:features' %}?source_type={{ source_type }}{% if selected_project %}&project={{ selected_project.pk }}{% endif %}">پاک کردن</a>
+            </div>
+        </form>
+        {% if calculator_errors %}
+            <div class="message error">{{ calculator_errors|join:"، " }}</div>
+        {% endif %}
+        {% if calculator_result %}
+            <div class="preview-grid">
+                <div class="preview-item"><strong>عدد ابجد</strong><span>{{ calculator_result.abjad_value }}</span></div>
+                <div class="preview-item"><strong>چندمین عدد اول</strong><span>{{ calculator_result.prime_index }}</span></div>
+                <div class="preview-item"><strong>ریشه عدد</strong><span>{{ calculator_result.digit_root }}</span></div>
+                <div class="preview-item"><strong>زوج یا فرد</strong><span>{{ calculator_result.parity_label }}</span></div>
+                <div class="preview-item"><strong>تعداد حروف</strong><span>{{ calculator_result.letter_count }}</span></div>
+                <div class="preview-item"><strong>تعداد نقطه</strong><span>{{ calculator_result.dot_count }}</span></div>
+                <div class="preview-item"><strong>تعداد حروف یکتا</strong><span>{{ calculator_result.unique_letter_count }}</span></div>
+                <div class="preview-item"><strong>حروف استفاده شده</strong><span>{{ calculator_result.used_letters }}</span></div>
+                <div class="preview-item full-width"><strong>تبدیل حرف به عدد</strong><span>{{ calculator_result.breakdown }}</span></div>
+            </div>
+        {% endif %}
+    </article>
+
+    <article class="card">
+        <div class="section-head">
+            <h2>تغییرات اخیر</h2>
+        </div>
+        <p class="muted">آخرین ۱۰۰ ویرایش یا حذف نگه داشته می‌شود و از همین‌جا می‌توانید آن‌ها را برگردانید.</p>
+        <div class="duplicate-rows">
+            {% for log in change_logs %}
+                <div class="duplicate-row">
+                    <div>
+                        <strong>{{ log.get_action_display }} {{ log.get_target_model_display }}: {{ log.target_label|default:"بدون عنوان" }}</strong>
+                        <small>
+                            {% if log.actor %}توسط {{ log.actor }}{% else %}کاربر حذف‌شده{% endif %}
+                            | {{ log.created_at|date:"Y/m/d H:i" }}
+                            {% if log.undone_at %}| بازگردانی‌شده در {{ log.undone_at|date:"Y/m/d H:i" }}{% endif %}
+                        </small>
+                    </div>
+                    <div class="actions-row">
+                        {% if not log.undone_at %}
+                            <form method="post" action="{% url 'entries:change_log_undo' log.pk %}">
+                                {% csrf_token %}
+                                <button type="submit" class="secondary-btn">بازگردانی</button>
+                            </form>
+                        {% else %}
+                            <span class="keep-badge">بازگردانی شد</span>
+                        {% endif %}
+                    </div>
+                </div>
+            {% empty %}
+                <p class="muted">هنوز تغییری برای نمایش ثبت نشده است.</p>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="card">
+        <div class="section-head">
+            <h2>حذف جملات تکراری</h2>
+        </div>
+        <form method="get" class="form-grid">
+            <label class="field">
+                <span>منبع داده</span>
+                <select name="source_type">
+                    <option value="project" {% if source_type == 'project' %}selected{% endif %}>جدول پروژه</option>
+                    {% if can_manage_main_duplicates %}
+                        <option value="main" {% if source_type == 'main' %}selected{% endif %}>جدول اصلی</option>
+                    {% endif %}
+                </select>
+            </label>
+            <label class="field">
+                <span>پروژه</span>
+                <select name="project" {% if source_type == 'main' %}disabled{% endif %}>
+                    {% for project in accessible_projects %}
+                        <option value="{{ project.pk }}" {% if selected_project and selected_project.pk == project.pk %}selected{% endif %}>{{ project.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <div class="actions-row">
+                <button type="submit" class="primary-btn">بررسی تکراری‌ها</button>
+            </div>
+        </form>
+
+        {% if duplicate_label %}
+            <div class="duplicate-summary">
+                <strong>{{ duplicate_label }}</strong>
+                <span class="muted">{{ duplicate_groups|length }} گروه تکراری پیدا شد.</span>
+            </div>
+        {% endif %}
+
+        {% if duplicate_groups %}
+            <form method="post" action="{% url 'entries:features_duplicates_delete' %}" class="duplicate-form">
+                {% csrf_token %}
+                <input type="hidden" name="source_type" value="{{ source_type }}">
+                <input type="hidden" name="project" value="{{ selected_project.pk|default:'' }}">
+                <label class="select-all-card">
+                    <input type="checkbox" name="delete_all" value="1">
+                    <span>همه تکراری‌ها بدون بررسی حذف شوند و فقط یک نسخه باقی بماند</span>
+                </label>
+                <div class="duplicate-groups">
+                    {% for group in duplicate_groups %}
+                        <section class="duplicate-group">
+                            <div class="section-head">
+                                <strong>گروه {{ forloop.counter }}</strong>
+                                <span class="muted">{{ group.count }} مورد مشابه</span>
+                            </div>
+                            <div class="duplicate-rows">
+                                {% for entry in group.entries %}
+                                    <label class="duplicate-row {% if entry.pk == group.keep_entry.pk %}keep-row{% endif %}">
+                                        {% if entry.pk != group.keep_entry.pk %}
+                                            <input type="checkbox" name="delete_ids" value="{{ entry.pk }}">
+                                        {% else %}
+                                            <input type="checkbox" checked disabled>
+                                        {% endif %}
+                                        <div>
+                                            <strong>{{ entry.phrase }}</strong>
+                                            <small>ردیف {{ entry.row_number }} | کلید تشابه: {{ group.key }}</small>
+                                        </div>
+                                        {% if entry.pk == group.keep_entry.pk %}
+                                            <span class="keep-badge">نسخه نگهداری‌شونده</span>
+                                        {% endif %}
+                                    </label>
+                                {% endfor %}
+                            </div>
+                        </section>
+                    {% endfor %}
+                </div>
+                <div class="actions-row">
+                    <button type="submit" class="primary-btn">حذف موارد انتخاب‌شده</button>
+                </div>
+            </form>
+        {% elif duplicate_label %}
+            <p class="muted">مورد تکراری‌ای پیدا نشد.</p>
+        {% endif %}
+    </article>
+
+    <article class="card">
+        <div class="section-head">
+            <h2>بکاپ و بازیابی</h2>
+        </div>
+        {% if request.user.is_staff %}
+            <p class="muted">برای نگهداری کل سیستم می‌توانید بکاپ کامل JSON بگیرید و در کنار آن از دیتابیس هم خروجی `sql` یا `sqlite` داشته باشید.</p>
+            <div class="actions-row">
+                <a class="primary-btn" href="{% url 'entries:features_full_backup_export' %}">بکاپ کامل سیستم</a>
+                <a class="secondary-btn" href="{% url 'entries:features_database_export' 'sql' %}">خروجی sql</a>
+                <a class="secondary-btn" href="{% url 'entries:features_database_export' 'sqlite' %}">خروجی sqlite</a>
+            </div>
+            <form method="post" enctype="multipart/form-data" action="{% url 'entries:features_database_import' %}" class="database-import-form">
+                {% csrf_token %}
+                <label class="field full-width">
+                    <span>بازیابی از فایل sql یا sqlite</span>
+                    <input type="file" name="file" accept=".sql,.sqlite,.sqlite3,.db">
+                </label>
+                <button type="submit" class="primary-btn">بازیابی دیتابیس</button>
+            </form>
+        {% else %}
+            <p class="muted">این بخش فقط برای مدیر سیستم فعال است.</p>
+        {% endif %}
+    </article>
+</section>
+{% endblock %}

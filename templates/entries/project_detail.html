@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% load entries_extras %}
+{% block title %}{{ project.name }} | ابجد{% endblock %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <span class="eyebrow">جدول پروژه</span>
+        <h1>{{ project.name }}</h1>
+        <p>{{ project.description|default:"برای این جدول توضیحی ثبت نشده است." }}</p>
+    </div>
+    <div class="header-actions">
+        <button class="primary-btn" type="button" data-open-modal="abjad-modal">تبدیل عبارت و افزودن</button>
+        <a class="secondary-btn" href="{% url 'entries:project_update' project.pk %}">ویرایش جدول</a>
+    </div>
+</section>
+
+<section class="card">
+    <p class="inline-hint">تمام متن هر سلول نمایش داده می‌شود. با کشیدن لبه هدر، عرض ستون را تغییر دهید و از دکمه ستون‌ها برای مخفی یا نمایان کردن هر ستون استفاده کنید.</p>
+    <div class="toolbar split">
+        <form method="get" class="toolbar">
+            <input type="search" name="q" value="{{ q }}" placeholder="جستجو در عبارت‌ها">
+            <button class="secondary-btn" type="submit">جستجو</button>
+        </form>
+        <div class="toolbar">
+            <button class="secondary-btn" type="button" data-toggle-columns="project-table-columns">ستون‌ها</button>
+            <form method="post" enctype="multipart/form-data" action="{% url 'entries:project_import' project.pk %}">
+                {% csrf_token %}
+                {{ import_form.file }}
+                <button class="secondary-btn" type="submit">درون‌ریزی csv/xlsm</button>
+            </form>
+            <a class="ghost-link" href="{% url 'entries:project_export' project.pk 'csv' %}?{% query_transform %}">خروجی csv</a>
+            <a class="ghost-link" href="{% url 'entries:project_export' project.pk 'xlsm' %}?{% query_transform %}">خروجی xlsm</a>
+        </div>
+    </div>
+    <form method="get" class="filter-card">
+        <div class="filter-card-head">
+            <strong>فیلتر پیشرفته</strong>
+            <span class="muted">می‌توانید هم‌زمان چند شرط روی عبارت و همه فیلدهای محاسباتی بگذارید.</span>
+        </div>
+        <input type="hidden" name="q" value="{{ q }}">
+        <div class="filter-grid">
+            {% for row in filter_rows %}
+                <div class="filter-row">
+                    {% if not forloop.first %}
+                        <select name="filter_join_{{ row.index }}">
+                            <option value="and" {% if row.join == 'and' %}selected{% endif %}>و</option>
+                            <option value="or" {% if row.join == 'or' %}selected{% endif %}>یا</option>
+                        </select>
+                    {% else %}
+                        <div class="filter-join-label">اگر</div>
+                    {% endif %}
+                    <select name="filter_field_{{ row.index }}">
+                        <option value="">فیلد</option>
+                        {% for field, label, kind in filter_fields %}
+                            <option value="{{ field }}" {% if row.field == field %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="filter_operator_{{ row.index }}">
+                        {% for value, label in filter_operators %}
+                            <option value="{{ value }}" {% if row.operator == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" name="filter_value_{{ row.index }}" value="{{ row.value }}" placeholder="مقدار شرط">
+                </div>
+            {% endfor %}
+        </div>
+        <div class="actions-row">
+            <button type="submit" class="secondary-btn">اعمال فیلتر</button>
+            <a class="ghost-link" href="{% url 'entries:project_detail' project.pk %}">پاک کردن فیلترها</a>
+        </div>
+    </form>
+    <div class="quick-add-card">
+        <div>
+            <strong>افزودن سریع</strong>
+            <p class="muted">برای سرعت بیشتر، عبارت را مستقیم همین‌جا وارد کنید، ابجد را ببینید و بدون باز کردن پنجره به جدول اضافه کنید.</p>
+        </div>
+        <form id="quick-calc-form" class="quick-add-form" data-calc-url="{% url 'entries:project_calculate' project.pk %}" data-add-url="{% url 'entries:project_add_entry' project.pk %}">
+            {% csrf_token %}
+            <input type="text" name="phrase" id="quick-phrase-input" placeholder="عبارت را وارد کنید">
+            <button type="submit" class="secondary-btn">محاسبه</button>
+            <div class="quick-abjad-result">
+                <span>ابجد</span>
+                <strong id="quick-abjad-value">-</strong>
+            </div>
+            <button type="button" id="quick-add-button" class="primary-btn" disabled>افزودن مستقیم</button>
+        </form>
+        <form id="quick-add-submit-form" method="post" action="{% url 'entries:project_add_entry' project.pk %}" class="hidden">
+            {% csrf_token %}
+            <input type="hidden" name="phrase" id="quick-add-hidden-phrase">
+        </form>
+    </div>
+    <div id="project-table-columns" class="column-panel hidden">
+        <label><input type="checkbox" checked data-column-toggle="project-{{ project.pk }}" value="bulk_select"> انتخاب </label>
+        {% for field, label in headers.items %}
+            <label><input type="checkbox" checked data-column-toggle="project-{{ project.pk }}" value="{{ field }}"> {{ label }}</label>
+        {% endfor %}
+        <label><input type="checkbox" checked data-column-toggle="project-{{ project.pk }}" value="review_status_display"> وضعیت </label>
+        <label><input type="checkbox" checked data-column-toggle="project-{{ project.pk }}" value="actions"> عملیات </label>
+    </div>
+    <form method="post" action="{% url 'entries:project_bulk_action' project.pk %}" class="bulk-actions-card" id="project-bulk-form">
+        {% csrf_token %}
+        <input type="hidden" name="q" value="{{ q }}">
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="hidden" name="direction" value="{{ direction }}">
+        {% for row in filter_rows %}
+            <input type="hidden" name="filter_join_{{ row.index }}" value="{{ row.join }}">
+            <input type="hidden" name="filter_field_{{ row.index }}" value="{{ row.field }}">
+            <input type="hidden" name="filter_operator_{{ row.index }}" value="{{ row.operator }}">
+            <input type="hidden" name="filter_value_{{ row.index }}" value="{{ row.value }}">
+        {% endfor %}
+        <div class="bulk-actions-row">
+            <label class="bulk-check">
+                <input type="checkbox" id="select-all-project-rows">
+                <span>انتخاب همه ردیف‌های این صفحه</span>
+            </label>
+            <label class="bulk-check">
+                <input type="checkbox" id="select-all-project-filtered" name="select_all_filtered" value="1">
+                <span>انتخاب همه نتایج فیلترشده</span>
+            </label>
+            <select name="bulk_action">
+                <option value="">عملیات گروهی</option>
+                <option value="delete">حذف انتخاب‌شده‌ها</option>
+                <option value="move">انتقال به جدول دیگر</option>
+            </select>
+            <select name="target_project">
+                <option value="">پروژه مقصد</option>
+                {% for target in move_targets %}
+                    <option value="{{ target.pk }}">{{ target.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="secondary-btn">اجرای عملیات</button>
+        </div>
+    </form>
+
+    <div class="table-wrap">
+        <table class="data-table inline-edit-table" data-table-id="project-{{ project.pk }}">
+            <colgroup>
+                <col class="col-bulk-select" data-column="bulk_select">
+                <col class="col-row-number" data-column="row_number">
+                <col class="col-phrase" data-column="phrase">
+                <col class="col-number" data-column="abjad_value">
+                <col class="col-number" data-column="prime_index">
+                <col class="col-number" data-column="digit_root">
+                <col class="col-number" data-column="abjad_sum">
+                <col class="col-short-text" data-column="parity_label">
+                <col class="col-number" data-column="parity_order">
+                <col class="col-number" data-column="letter_count">
+                <col class="col-number" data-column="dot_count">
+                <col class="col-number" data-column="unique_letter_count">
+                <col class="col-used-letters" data-column="used_letters">
+                <col class="col-number" data-column="pronounced_value">
+                <col class="col-number" data-column="alif_count">
+                <col class="col-number" data-column="abjad_saghir">
+                <col class="col-breakdown" data-column="breakdown">
+                <col class="col-status" data-column="review_status_display">
+                <col class="col-actions" data-column="actions">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th data-column="bulk_select">
+                        <span class="th-content">انتخاب</span>
+                        <span class="col-resizer" data-resize-column="bulk_select"></span>
+                    </th>
+                    {% for field, label in headers.items %}
+                        {% if field == 'breakdown' %}
+                            <th data-column="{{ field }}">
+                                <span class="th-content">{{ label }}</span>
+                                <span class="col-resizer" data-resize-column="{{ field }}"></span>
+                            </th>
+                        {% else %}
+                            <th data-column="{{ field }}">
+                                {% if sort == field and direction == 'asc' %}
+                                    {% with next_dir='desc' %}
+                                        <a class="th-content" href="?{% query_transform sort=field direction=next_dir page='' %}">{{ label }}</a>
+                                    {% endwith %}
+                                {% else %}
+                                    <a class="th-content" href="?{% query_transform sort=field direction='asc' page='' %}">{{ label }}</a>
+                                {% endif %}
+                                <span class="col-resizer" data-resize-column="{{ field }}"></span>
+                            </th>
+                        {% endif %}
+                    {% endfor %}
+                    <th data-column="review_status_display">
+                        <span class="th-content">وضعیت</span>
+                        <span class="col-resizer" data-resize-column="review_status_display"></span>
+                    </th>
+                    <th data-column="actions">
+                        <span class="th-content">عملیات</span>
+                        <span class="col-resizer" data-resize-column="actions"></span>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in page_obj %}
+                    <tr data-inline-row="project" data-row-key="{{ entry.pk }}" data-update-url="{% url 'entries:project_entry_inline_update' entry.pk %}" class="{% if entry.has_mismatch %}mismatch-row{% endif %}">
+                        <td data-field="bulk_select" class="bulk-cell">
+                            <input type="checkbox" class="project-row-check" name="entry_ids" value="{{ entry.pk }}" form="project-bulk-form">
+                        </td>
+                        <td data-field="row_number" data-editable="true" data-input-type="number"><span class="cell-text">{{ entry.row_number }}</span></td>
+                        <td data-field="phrase" data-editable="true" data-input-type="text" class="{% if 'phrase' in entry.mismatch_fields %}mismatch-cell{% endif %}" title="{% if entry.invalid_phrase_chars %}کاراکترهای نامعتبر: {{ entry.invalid_phrase_chars|join:' ' }}{% endif %}"><span class="cell-text">{{ entry.phrase }}</span></td>
+                        <td data-field="abjad_value" data-editable="true" data-input-type="number" class="{% if 'abjad_value' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.abjad_value }}</span></td>
+                        <td data-field="prime_index" data-editable="true" data-input-type="number" class="{% if 'prime_index' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.prime_index }}</span></td>
+                        <td data-field="digit_root" data-editable="true" data-input-type="number" class="{% if 'digit_root' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.digit_root }}</span></td>
+                        <td data-field="abjad_sum" data-editable="true" data-input-type="number" class="{% if 'abjad_sum' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.abjad_sum }}</span></td>
+                        <td data-field="parity_label" data-editable="true" data-input-type="text" class="{% if 'parity_label' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.parity_label }}</span></td>
+                        <td data-field="parity_order" data-editable="true" data-input-type="number" class="{% if 'parity_order' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.parity_order }}</span></td>
+                        <td data-field="letter_count" data-editable="true" data-input-type="number" class="{% if 'letter_count' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.letter_count }}</span></td>
+                        <td data-field="dot_count" data-editable="true" data-input-type="number" class="{% if 'dot_count' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.dot_count }}</span></td>
+                        <td data-field="unique_letter_count" class="{% if 'unique_letter_count' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.unique_letter_count }}</span></td>
+                        <td data-field="used_letters" class="{% if 'used_letters' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.used_letters }}</span></td>
+                        <td data-field="pronounced_value" data-editable="true" data-input-type="number" class="{% if 'pronounced_value' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.pronounced_value }}</span></td>
+                        <td data-field="alif_count" data-editable="true" data-input-type="number" class="{% if 'alif_count' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.alif_count }}</span></td>
+                        <td data-field="abjad_saghir" data-editable="true" data-input-type="number" class="{% if 'abjad_saghir' in entry.mismatch_fields %}mismatch-cell{% endif %}"><span class="cell-text">{{ entry.abjad_saghir }}</span></td>
+                        <td class="breakdown-cell {% if 'breakdown' in entry.mismatch_fields %}mismatch-cell{% endif %}" data-field="breakdown" data-editable="true" data-input-type="text"><span class="cell-text">{{ entry.breakdown }}</span></td>
+                        <td data-field="review_status_display"><span class="cell-text">{{ entry.get_review_status_display }}</span></td>
+                        <td class="actions-cell" data-field="actions">
+                            {% if request.user.is_staff and entry.review_status != 'approved' %}
+                                <a href="{% url 'entries:project_entry_approve' entry.pk %}">انتقال به اصلی</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="19" class="muted center">هنوز رکوردی ثبت نشده است.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "entries/pagination.html" with page_obj=page_obj %}
+</section>
+
+<div id="abjad-modal" class="modal hidden">
+    <div class="modal-card">
+        <div class="section-head">
+            <h2>تبدیل حرف به عدد</h2>
+            <button type="button" class="icon-btn" data-close-modal="abjad-modal">×</button>
+        </div>
+        <form id="calc-form" data-calc-url="{% url 'entries:project_calculate' project.pk %}" data-add-url="{% url 'entries:project_add_entry' project.pk %}">
+            {% csrf_token %}
+            <label class="field">
+                <span>عبارت</span>
+                {{ phrase_form.phrase }}
+            </label>
+            <div class="actions-row">
+                <button type="submit" class="primary-btn">محاسبه</button>
+            </div>
+        </form>
+        <div id="calc-result" class="preview-grid hidden"></div>
+        <form id="add-entry-form" method="post" action="{% url 'entries:project_add_entry' project.pk %}" class="hidden">
+            {% csrf_token %}
+            <input type="hidden" name="phrase" id="phrase-hidden">
+            <button type="submit" class="primary-btn full-width">افزودن به جدول</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

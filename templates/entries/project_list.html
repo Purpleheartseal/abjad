@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}جدول‌های پروژه | ابجد{% endblock %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <span class="eyebrow">جدول‌ها</span>
+        <h1>جدول‌های پروژه</h1>
+        <p>هر کاربر می‌تواند جدول جداگانه بسازد و مدیر آن را بررسی و به جدول اصلی منتقل کند.</p>
+    </div>
+    <a class="primary-btn" href="{% url 'entries:project_create' %}">ایجاد جدول جدید</a>
+</section>
+
+<section class="card">
+    <form class="toolbar" method="get">
+        <input type="search" name="q" value="{{ q }}" placeholder="جستجو در نام یا توضیح جدول">
+        <button class="secondary-btn" type="submit">جستجو</button>
+    </form>
+    <div class="project-cards">
+        {% for project in projects %}
+            <article class="project-card solid">
+                <div>
+                    <strong>{{ project.name }}</strong>
+                    <span>مالک: {{ project.owner }}</span>
+                    <small>{{ project.entry_total }} رکورد | وضعیت: {{ project.get_status_display }}</small>
+                </div>
+                <div class="actions-row">
+                    <a class="ghost-link" href="{% url 'entries:project_detail' project.pk %}">باز کردن جدول</a>
+                    {% if request.user.is_staff or project.owner == request.user %}
+                        <form method="post" action="{% url 'entries:project_delete' project.pk %}" onsubmit="return confirm('این جدول و رکوردهایش حذف شوند؟');">
+                            {% csrf_token %}
+                            <button type="submit" class="danger-btn">حذف جدول</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </article>
+        {% empty %}
+            <p class="muted">جدولی پیدا نشد.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
